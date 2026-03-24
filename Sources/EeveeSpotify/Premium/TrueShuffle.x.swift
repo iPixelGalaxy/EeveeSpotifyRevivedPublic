@@ -43,48 +43,49 @@ struct TrueShuffleHookInstaller {
     // MARK: - Class discovery
 
     private static func findShuffleClass() -> AnyClass? {
-        var classCount: UInt32 = 0
-        guard let classList = objc_copyClassList(&classCount) else { return nil }
-        defer { free(UnsafeMutableRawPointer(mutating: classList)) }
+        var count: UInt32 = 0
+        guard let classes = objc_copyClassList(&count) else { return nil }
 
-        for i in 0..<Int(classCount) {
-            let cls: AnyClass = classList[i]
-            let name = String(cString: class_getName(cls))
-            if name.lowercased().contains("shuff") {
-                return cls
-            }
+        // Collect into a Swift array so we can free the C array right away
+        let allClasses: [AnyClass] = (0..<Int(count)).map { classes[$0] }
+        free(unsafeBitCast(classes, to: UnsafeMutableRawPointer.self))
+
+        return allClasses.first {
+            String(cString: class_getName($0)).lowercased().contains("shuff")
         }
-        return nil
     }
 
     // MARK: - weightForTrack:recommendedTrack:mergedList:
 
     private static func swizzleWeightForTrack(on cls: AnyClass) {
         let sel = Selector(("weightForTrack:recommendedTrack:mergedList:"))
-        guard let originalMethod = class_getInstanceMethod(cls, sel) else { return }
+        guard let method = class_getInstanceMethod(cls, sel) else { return }
 
-        let originalIMP = method_getImplementation(originalMethod)
+        // Capture the original IMP and selector before installing the replacement.
+        let origIMP = method_getImplementation(method)
+        let capturedSel = sel
 
-        // Replacement: pass `false` for both boolean parameters, neutralising the bias.
-        typealias WeightIMP = @convention(c) (AnyObject, Selector, AnyObject, Bool, Bool) -> Double
-        let replacement: WeightIMP = { slf, _sel, track, _, _ in
-            let orig = unsafeBitCast(originalIMP, to: WeightIMP.self)
-            return orig(slf, _sel, track, false, false)
+        // imp_implementationWithBlock expects a @convention(block) closure.
+        // Unlike @convention(c), blocks ARE allowed to capture context.
+        // The block receives (self, arg1, arg2, …) — the SEL is not passed.
+        let replacement: @convention(block) (AnyObject, AnyObject, Bool, Bool) -> Double = { self_, track, _, _ in
+            typealias Fn = @convention(c) (AnyObject, Selector, AnyObject, Bool, Bool) -> Double
+            // Call the original implementation but force both bias flags to false,
+            // so every track receives an equal weight.
+            return unsafeBitCast(origIMP, to: Fn.self)(self_, capturedSel, track, false, false)
         }
 
-        method_setImplementation(originalMethod, imp_implementationWithBlock(replacement as AnyObject))
+        method_setImplementation(method, imp_implementationWithBlock(replacement))
     }
 
     // MARK: - weightedShuffleListWithTracks:recommendations:
 
     private static func swizzleWeightedShuffleList(on cls: AnyClass) {
         let sel = Selector(("weightedShuffleListWithTracks:recommendations:"))
-        guard let originalMethod = class_getInstanceMethod(cls, sel) else { return }
+        guard let method = class_getInstanceMethod(cls, sel) else { return }
 
-        // Replacement: return nil to skip the weighted pre-shuffle entirely.
-        typealias ShuffleListIMP = @convention(c) (AnyObject, Selector, AnyObject, AnyObject) -> AnyObject?
-        let replacement: ShuffleListIMP = { _, _, _, _ in nil }
-
-        method_setImplementation(originalMethod, imp_implementationWithBlock(replacement as AnyObject))
+        // Return nil to skip Spotify's weighted pre-shuffle list generation entirely.
+        let replacement: @convention(block) (AnyObject, AnyObject, AnyObject) -> AnyObject? = { _, _, _ in nil }
+        method_setImplementation(method, imp_implementationWithBlock(replacement))
     }
 }
