@@ -10,6 +10,7 @@ extension UserDefaults {
     private static let lyricsColorsKey = "lyricsColors"
     private static let lyricsOptionsKey = "lyricsOptions"
     private static let hasShownCommonIssuesTipKey = "hasShownCommonIssuesTip"
+    private static let trueShuffleEnabledKey = "trueShuffleEnabled"
 
     static var musixmatchToken: String {
         get {
@@ -57,6 +58,17 @@ extension UserDefaults {
         }
         set (hasShownCommonIssuesTip) {
             container.set(hasShownCommonIssuesTip, forKey: hasShownCommonIssuesTipKey)
+        }
+    }
+
+    /// Whether True Shuffle is enabled. Defaults to `true` (on by default).
+    static var trueShuffleEnabled: Bool {
+        get {
+            // Default to true — if the key has never been written, treat as enabled
+            container.object(forKey: trueShuffleEnabledKey) as? Bool ?? true
+        }
+        set {
+            container.set(newValue, forKey: trueShuffleEnabledKey)
         }
     }
 }

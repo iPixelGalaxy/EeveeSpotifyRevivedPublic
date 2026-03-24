@@ -6,10 +6,11 @@ enum LyricsSource: Int, CaseIterable, CustomStringConvertible {
     case musixmatch
     case petit
     case notReplaced
-    
+    case spicyLyrics = 5
+
     // All sources enabled now that we have reliable metadata fetching
     public static var allCases: [LyricsSource] {
-        return [.musixmatch]
+        return [.musixmatch, .spicyLyrics]
     }
 
     // swift 5.8 compatible
@@ -23,6 +24,8 @@ enum LyricsSource: Int, CaseIterable, CustomStringConvertible {
         return "Musixmatch"
     case .petit:
         return "PetitLyrics"
+    case .spicyLyrics:
+        return "Spicy Lyrics"
     case .notReplaced:
         return "Spotify"
     }

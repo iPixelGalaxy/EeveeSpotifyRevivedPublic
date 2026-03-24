@@ -29,6 +29,7 @@ private func loadCustomLyricsForTrackId(_ trackId: String) throws -> Lyrics {
     var hasMetadata = false
     
     // If metadata is needed (Genius/LRCLIB/Petit), fetch using token
+    // Musixmatch and SpicyLyrics only need the track ID
     let needsMetadata = source == .genius || source == .lrclib || source == .petit
     
     // Check if we already have the metadata cached for this exact trackId
@@ -102,14 +103,16 @@ private func loadCustomLyricsForTrackId(_ trackId: String) throws -> Lyrics {
         repository = MusixmatchLyricsRepository.shared
     case .petit:
         repository = petitLyricsRepository
+    case .spicyLyrics:
+        repository = SpicyLyricsRepository.shared
     case .notReplaced:
         throw LyricsError.invalidSource
     }
-    
+
     let lyricsDto: LyricsDto
-    
+
     lyricsState = LyricsLoadingState()
-    
+
     do {
         lyricsDto = try repository.getLyrics(searchQuery, options: options)
     }
@@ -170,14 +173,16 @@ private func loadCustomLyricsForCurrentTrack() throws -> Lyrics {
         repository = MusixmatchLyricsRepository.shared
     case .petit:
         repository = petitLyricsRepository
+    case .spicyLyrics:
+        repository = SpicyLyricsRepository.shared
     case .notReplaced:
         throw LyricsError.invalidSource
     }
-    
+
     let lyricsDto: LyricsDto
-    
+
     lyricsState = LyricsLoadingState()
-    
+
     do {
         lyricsDto = try repository.getLyrics(searchQuery, options: options)
     }
