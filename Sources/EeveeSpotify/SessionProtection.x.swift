@@ -337,6 +337,18 @@ class URLSessionTaskResumeHook: ClassHook<NSObject> {
                 writeDebugLog("[NET] Auth request: \(method) \(host)\(path) at \(elapsedInt)s")
             }
 
+            // Capture the Spotify OAuth token from any outgoing request that carries it.
+            // This is a broader capture point than SPTDataLoaderService alone, which only
+            // fires for requests that go through that specific loader.
+            if spotifyAccessToken == nil,
+               let authHeader = task.currentRequest?.allHTTPHeaderFields?["Authorization"]
+                    ?? task.currentRequest?.allHTTPHeaderFields?["authorization"],
+               authHeader.hasPrefix("Bearer ") {
+                let captured = String(authHeader.dropFirst(7))
+                spotifyAccessToken = captured
+                writeDebugLog("[NET] Captured access token at \(elapsedInt)s (prefix: \(String(captured.prefix(8)))…)")
+            }
+
             // NOTE: Do NOT block login5 or googleapis.com/token.
             // login5 re-auths every ~3 min; blocking it causes a crash/panic loop.
             // Logout protection comes from blocking session destroy, DeleteToken, etc. below.

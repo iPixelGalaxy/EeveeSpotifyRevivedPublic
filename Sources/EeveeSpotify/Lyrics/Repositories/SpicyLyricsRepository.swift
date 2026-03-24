@@ -20,6 +20,8 @@ class SpicyLyricsRepository: LyricsRepository {
 
     private func fetchLyricsData(trackId: String) throws -> SpicyLyricsData {
         let url = URL(string: "\(apiUrl)/query")!
+        let hasToken = spotifyAccessToken != nil
+        writeDebugLog("[SpicyLyrics] Fetching trackId=\(trackId) hasToken=\(hasToken)")
 
         let body = SpicyLyricsRequest(
             queries: [
@@ -48,35 +50,57 @@ class SpicyLyricsRepository: LyricsRepository {
         let semaphore = DispatchSemaphore(value: 0)
         var responseData: Data?
         var networkError: Error?
+        var httpStatus: Int = -1
 
-        session.dataTask(with: request) { data, _, err in
+        session.dataTask(with: request) { data, response, err in
             responseData = data
             networkError = err
+            if let http = response as? HTTPURLResponse {
+                httpStatus = http.statusCode
+            }
             semaphore.signal()
         }.resume()
         semaphore.wait()
 
-        if let networkError = networkError { throw networkError }
-        guard let data = responseData else { throw LyricsError.decodingError }
+        if let networkError = networkError {
+            writeDebugLog("[SpicyLyrics] Network error: \(networkError)")
+            throw networkError
+        }
+        guard let data = responseData else {
+            writeDebugLog("[SpicyLyrics] No response data")
+            throw LyricsError.decodingError
+        }
+        writeDebugLog("[SpicyLyrics] HTTP \(httpStatus), body \(data.count) bytes")
 
         let envelope: SpicyLyricsResponse
         do {
             envelope = try JSONDecoder().decode(SpicyLyricsResponse.self, from: data)
         } catch {
+            let raw = String(data: data, encoding: .utf8) ?? "<non-utf8>"
+            writeDebugLog("[SpicyLyrics] Decode error: \(error) | raw: \(raw.prefix(300))")
             throw LyricsError.decodingError
         }
 
         guard let queryResult = envelope.queries.first(where: { $0.operationId == "0" }) else {
+            writeDebugLog("[SpicyLyrics] No query result with operationId=0")
             throw LyricsError.decodingError
         }
 
-        switch queryResult.result.httpStatus {
+        let apiStatus = queryResult.result.httpStatus
+        writeDebugLog("[SpicyLyrics] API status=\(apiStatus)")
+        switch apiStatus {
         case 200:
-            guard let lyricsData = queryResult.result.data else { throw LyricsError.decodingError }
+            guard let lyricsData = queryResult.result.data else {
+                writeDebugLog("[SpicyLyrics] 200 but data is nil")
+                throw LyricsError.decodingError
+            }
+            writeDebugLog("[SpicyLyrics] Got lyrics type=\(lyricsData.type)")
             return lyricsData
         case 404:
+            writeDebugLog("[SpicyLyrics] 404 no such song")
             throw LyricsError.noSuchSong
         default:
+            writeDebugLog("[SpicyLyrics] Unexpected status \(apiStatus)")
             throw LyricsError.unknownError
         }
     }
