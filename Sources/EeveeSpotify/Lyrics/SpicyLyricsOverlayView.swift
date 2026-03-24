@@ -255,7 +255,9 @@ class SpicyLyricsOverlayView: UIView {
     private func startDisplayLink() {
         displayLink?.invalidate()
         displayLink = CADisplayLink(target: self, selector: #selector(tick))
-        displayLink?.preferredFrameRateRange = CAFrameRateRange(minimum: 30, maximum: 60, preferred: 60)
+        if #available(iOS 15, *) {
+            displayLink?.preferredFrameRateRange = CAFrameRateRange(minimum: 30, maximum: 60, preferred: 60)
+        }
         displayLink?.add(to: .main, forMode: .common)
     }
 

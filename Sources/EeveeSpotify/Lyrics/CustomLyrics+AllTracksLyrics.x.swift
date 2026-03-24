@@ -54,7 +54,7 @@ class NPVScrollViewControllerHook: ClassHook<NSObject> {
               spicySyllableLines != nil || spicyLineSyncLines != nil else { return }
 
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-            guard let vc = Dynamic.convert(self.target, to: UIViewController.self) else { return }
+            let vc = Dynamic.convert(self.target, to: UIViewController.self)
             spicyLyricsOverlay?.stop()
             spicyLyricsOverlay?.removeFromSuperview()
 
@@ -94,7 +94,7 @@ class NPVScrollViewControllerV91Hook: ClassHook<NSObject> {
               spicySyllableLines != nil || spicyLineSyncLines != nil else { return }
 
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-            guard let vc = Dynamic.convert(self.target, to: UIViewController.self) else { return }
+            let vc = Dynamic.convert(self.target, to: UIViewController.self)
             spicyLyricsOverlay?.stop()
             spicyLyricsOverlay?.removeFromSuperview()
 
