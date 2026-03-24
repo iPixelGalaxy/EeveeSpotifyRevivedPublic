@@ -4,8 +4,9 @@ class SpicyLyricsRepository: LyricsRepository {
     static let shared = SpicyLyricsRepository()
 
     private let apiUrl = "https://api.spicylyrics.org"
-    // Must satisfy the server-side version check
-    private let clientVersion = "100.10.67"
+    // Fallback version — overwritten at runtime by fetchServerVersion()
+    private var clientVersion = "100.10.67"
+    private var versionFetched = false
     private let session: URLSession
 
     private init() {
@@ -16,12 +17,71 @@ class SpicyLyricsRepository: LyricsRepository {
         session = URLSession(configuration: configuration)
     }
 
+    // MARK: - Dynamic version fetch
+
+    /// Queries the server's ext_version endpoint and caches the result.
+    /// Call once before the first lyrics fetch.
+    private func fetchServerVersion() {
+        guard !versionFetched else { return }
+        versionFetched = true  // Set early to avoid concurrent fetches
+
+        // Dedicated Codable types — ext_version returns `data` as a plain String
+        struct VersionRequest: Encodable {
+            struct Query: Encodable { let operation: String }
+            struct Client: Encodable { let version: String }
+            let queries: [Query]
+            let client: Client
+        }
+        struct VersionResultContent: Decodable {
+            let httpStatus: Int
+            let data: String?
+        }
+        struct VersionQueryResult: Decodable {
+            let operationId: String
+            let result: VersionResultContent
+        }
+        struct VersionResponse: Decodable {
+            let queries: [VersionQueryResult]
+        }
+
+        let body = VersionRequest(
+            queries: [VersionRequest.Query(operation: "ext_version")],
+            client: VersionRequest.Client(version: clientVersion)
+        )
+
+        guard let url = URL(string: "\(apiUrl)/query"),
+              let bodyData = try? JSONEncoder().encode(body) else { return }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue(clientVersion, forHTTPHeaderField: "SpicyLyrics-Version")
+        request.httpBody = bodyData
+
+        let semaphore = DispatchSemaphore(value: 0)
+        session.dataTask(with: request) { [weak self] data, _, _ in
+            defer { semaphore.signal() }
+            guard let self = self,
+                  let data = data,
+                  let envelope = try? JSONDecoder().decode(VersionResponse.self, from: data),
+                  let result = envelope.queries.first(where: { $0.operationId == "0" }),
+                  result.result.httpStatus == 200,
+                  let versionString = result.result.data,
+                  !versionString.isEmpty else { return }
+            self.clientVersion = versionString
+            writeDebugLog("[SpicyLyrics] Server version: \(versionString)")
+        }.resume()
+        semaphore.wait()
+    }
+
     // MARK: - Network
 
     private func fetchLyricsData(trackId: String) throws -> SpicyLyricsData {
+        fetchServerVersion()
+
         let url = URL(string: "\(apiUrl)/query")!
         let hasToken = spotifyAccessToken != nil
-        writeDebugLog("[SpicyLyrics] Fetching trackId=\(trackId) hasToken=\(hasToken)")
+        writeDebugLog("[SpicyLyrics] Fetching trackId=\(trackId) hasToken=\(hasToken) version=\(clientVersion)")
 
         let body = SpicyLyricsRequest(
             queries: [
