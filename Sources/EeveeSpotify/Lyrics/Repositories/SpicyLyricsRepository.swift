@@ -227,6 +227,51 @@ class SpicyLyricsRepository: LyricsRepository {
 
         if lines.isEmpty { throw LyricsError.noSuchSong }
 
+        // Store syllable data for the custom overlay renderer
+        spicyLyricsTrackId = query.spotifyTrackId
+        switch data.type {
+        case "Syllable":
+            if let content = data.content {
+                spicySyllableLines = content
+                    .filter { $0.type == "Vocal" }
+                    .compactMap { group -> SpicySyllableLine? in
+                        guard let lead = group.lead, !lead.syllables.isEmpty else { return nil }
+                        let words = lead.syllables.map { s in
+                            SpicySyllableWord(
+                                text: s.text,
+                                startMs: Int(s.startTime * 1000),
+                                endMs: Int(s.endTime * 1000),
+                                isPartOfWord: s.isPartOfWord
+                            )
+                        }
+                        return SpicySyllableLine(
+                            startMs: Int(lead.startTime * 1000),
+                            endMs: Int(lead.endTime * 1000),
+                            words: words
+                        )
+                    }
+                spicyLineSyncLines = nil
+            }
+        case "Line":
+            if let content = data.content {
+                spicyLineSyncLines = content
+                    .filter { $0.type == "Vocal" }
+                    .compactMap { group -> SpicyLineSyncLine? in
+                        guard let startTime = group.startTime, let endTime = group.endTime,
+                              let text = group.text else { return nil }
+                        return SpicyLineSyncLine(
+                            text: text,
+                            startMs: Int(startTime * 1000),
+                            endMs: Int(endTime * 1000)
+                        )
+                    }
+                spicySyllableLines = nil
+            }
+        default:
+            spicySyllableLines = nil
+            spicyLineSyncLines = nil
+        }
+
         return LyricsDto(lines: lines, timeSynced: timeSynced, romanization: romanizationStatus)
     }
 }

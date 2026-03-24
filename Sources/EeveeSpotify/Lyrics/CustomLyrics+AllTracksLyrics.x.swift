@@ -3,6 +3,8 @@ import UIKit
 
 private var shouldOverrideLocalTrackURI = false
 
+var spicyLyricsOverlay: SpicyLyricsOverlayView?
+
 // SPTPlayerTrack metadata hooks not compatible with 9.1.x
 class SPTPlayerTrackHook: ClassHook<NSObject> {
     typealias Group = LyricsErrorHandlingGroup  // Not activated for 9.1.x
@@ -39,7 +41,7 @@ class LyricsScrollProviderHook: ClassHook<NSObject> {
     }
 }
 
-// NPVScrollViewController not compatible with 9.1.x  
+// NPVScrollViewController not compatible with 9.1.x
 class NPVScrollViewControllerHook: ClassHook<NSObject> {
     typealias Group = LyricsErrorHandlingGroup  // Not activated for 9.1.x (moved from ModernLyricsGroup)
     static var targetName = "NowPlaying_ScrollImpl.NPVScrollViewController"
@@ -47,11 +49,35 @@ class NPVScrollViewControllerHook: ClassHook<NSObject> {
     func viewWillAppear(_ animated: Bool) {
         shouldOverrideLocalTrackURI = true
         orig.viewWillAppear(animated)
+
+        guard UserDefaults.lyricsSource == .spicyLyrics,
+              spicySyllableLines != nil || spicyLineSyncLines != nil else { return }
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+            guard let vc = Dynamic.convert(self.target, to: UIViewController.self) else { return }
+            spicyLyricsOverlay?.stop()
+            spicyLyricsOverlay?.removeFromSuperview()
+
+            let overlay = SpicyLyricsOverlayView(frame: vc.view.bounds)
+            overlay.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+            vc.view.addSubview(overlay)
+            spicyLyricsOverlay = overlay
+
+            if let syllable = spicySyllableLines {
+                overlay.configureSyllable(syllable)
+            } else if let lineSync = spicyLineSyncLines {
+                overlay.configureLineSync(lineSync)
+            }
+        }
     }
-    
+
     func viewWillDisappear(_ animated: Bool) {
         shouldOverrideLocalTrackURI = false
         orig.viewWillDisappear(animated)
+
+        spicyLyricsOverlay?.stop()
+        spicyLyricsOverlay?.removeFromSuperview()
+        spicyLyricsOverlay = nil
     }
 }
 
@@ -63,11 +89,35 @@ class NPVScrollViewControllerV91Hook: ClassHook<NSObject> {
     func viewWillAppear(_ animated: Bool) {
         shouldOverrideLocalTrackURI = true
         orig.viewWillAppear(animated)
+
+        guard UserDefaults.lyricsSource == .spicyLyrics,
+              spicySyllableLines != nil || spicyLineSyncLines != nil else { return }
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+            guard let vc = Dynamic.convert(self.target, to: UIViewController.self) else { return }
+            spicyLyricsOverlay?.stop()
+            spicyLyricsOverlay?.removeFromSuperview()
+
+            let overlay = SpicyLyricsOverlayView(frame: vc.view.bounds)
+            overlay.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+            vc.view.addSubview(overlay)
+            spicyLyricsOverlay = overlay
+
+            if let syllable = spicySyllableLines {
+                overlay.configureSyllable(syllable)
+            } else if let lineSync = spicyLineSyncLines {
+                overlay.configureLineSync(lineSync)
+            }
+        }
     }
-    
+
     func viewWillDisappear(_ animated: Bool) {
         shouldOverrideLocalTrackURI = false
         orig.viewWillDisappear(animated)
+
+        spicyLyricsOverlay?.stop()
+        spicyLyricsOverlay?.removeFromSuperview()
+        spicyLyricsOverlay = nil
     }
 }
 

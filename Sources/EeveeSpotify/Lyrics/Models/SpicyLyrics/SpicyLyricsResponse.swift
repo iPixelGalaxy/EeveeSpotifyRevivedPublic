@@ -43,6 +43,7 @@ struct SpicyLyricsData: Decodable {
     let lines: [SpicyStaticLine]?       // Static type
     let language: String?
     let languageISO2: String?
+    // Server omits this key when false (e.g. western/static lyrics)
     let includesRomanization: Bool
 
     enum CodingKeys: String, CodingKey {
@@ -52,6 +53,17 @@ struct SpicyLyricsData: Decodable {
         case language             = "Language"
         case languageISO2         = "LanguageISO2"
         case includesRomanization = "IncludesRomanization"
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        type              = try c.decode(String.self,              forKey: .type)
+        content           = try c.decodeIfPresent([SpicyVocalGroup].self, forKey: .content)
+        lines             = try c.decodeIfPresent([SpicyStaticLine].self, forKey: .lines)
+        language          = try c.decodeIfPresent(String.self,     forKey: .language)
+        languageISO2      = try c.decodeIfPresent(String.self,     forKey: .languageISO2)
+        // Default to false — the server only sends this key when it is true
+        includesRomanization = try c.decodeIfPresent(Bool.self, forKey: .includesRomanization) ?? false
     }
 }
 
