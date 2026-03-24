@@ -131,6 +131,9 @@ class SpicyLyricsRepository: LyricsRepository {
             throw LyricsError.decodingError
         }
         writeDebugLog("[SpicyLyrics] HTTP \(httpStatus), body \(data.count) bytes")
+        if let raw = String(data: data, encoding: .utf8) {
+            writeDebugLog("[SpicyLyrics] Raw: \(raw.prefix(600))")
+        }
 
         let envelope: SpicyLyricsResponse
         do {
